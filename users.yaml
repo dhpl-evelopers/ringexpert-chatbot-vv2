@@ -1,5 +1,15 @@
 users:
+  2742_dhanashri@katalystindia.org:
+    password: $2b$12$d1PjUYcB.bO/JR5AnZPNUesHSS5LsG1LkxGmsdrHnnwKXjk2HBB72
+    provider: google
+  Test:
+    password: $2b$12$EyWnFmiHGEbIviJZzPRjnezGMq/.rbzbQrfJuLks/NikV4Z81CZWW
   demo:
     password: $2b$12$gij2YkypdfjmO68PoKdJ2OgGrQ789dsEUqnp5jrfO8Ifjwup9.e52
+  dhanabkb@gmail.com:
+    password: $2b$12$AvFX2Ciwb3/8gvjeSZiVWeMGjPkTbZlAObCN69P/V1r9RMjacmsIm
+  dhanashrinanekar11@gmail.com:
+    password: $2b$12$Nh6ujdr2X5IJl0E8C1Pg4eVeJVQJCkAZyQqZQRnNvGslKeWKEBIoK
+    provider: google
   test:
     password: $2b$12$By1oa0BQX6pil3qM3z58IOUsD/3XQXvSYh7clbPWi5/UFGOMmgXFW
