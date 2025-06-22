@@ -12,12 +12,9 @@ import logging
 import re
 import base64
 
-# Load environment variables
-load_dotenv()
-
-# Verify Azure connection string is loaded
-if not os.getenv("AZURE_CONNECTION_STRING"):
-    raise ValueError("Azure Storage connection string not found in environment variables")
+if "AZURE_STORAGE_CONNECTION_STRING" not in st.secrets:
+    st.error("Azure Storage connection not configured in secrets")
+    st.stop()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -85,7 +82,7 @@ class Config:
     # Azure Storage Configuration
   
     # Azure Storage Configuration
-    AZURE_CONNECTION_STRING = os.getenv("AZURE_CONNECTION_STRING")  # Changed
+    AZURE_CONNECTION_STRING = st.secrets["AZURE_STORAGE_CONNECTION_STRING"]
     CONTAINER_NAME = "bot-data"  # (Can stay hardcoded - non-secret)
 
     # OAuth Configuration
@@ -234,7 +231,7 @@ class OAuthService:
     @staticmethod
     def get_google_auth_url():
         client = OAuth2Session(
-            Config.GOOGLE_CLIENT_ID,
+            st.secrets["GOOGLE_CLIENT_ID"],
             Config.GOOGLE_CLIENT_SECRET,
             redirect_uri=Config.REDIRECT_URI
         )
@@ -885,29 +882,7 @@ if st.session_state.get("explore_ring_mode", False):
     - ⚖ **Quantity of Gold**  
     - 🟡 **Gold Karat**  
     """)
-    # 🔍 Explore the details of your ring button
-    if st.button("🔍 Explore the details of your ring", key="explore_ring_btn"):
-        if not st.session_state.logged_in:
-            st.session_state.show_auth = True
-            st.warning("Please log in or sign up to explore ring details.")
-            st.rerun()
-        else:
-            st.session_state.explore_ring_mode = True
-            st.session_state.show_quick_prompts = False
-            st.rerun()
-
-    # 📸 Show ring upload UI if in explore mode
-    if st.session_state.get("explore_ring_mode", False):
-        st.markdown("### 📸 Upload Images of Your Ring")
-        st.markdown("""
-        Please upload **images from different angles**. The AI will help determine:
-
-        - 💎 **Size of Diamonds**  
-        - 🔢 **Number of Diamonds on the Ring**  
-        - ⚖ **Quantity of Gold**  
-        - 🟡 **Gold Karat**  
-        """)
-
+    
 
     uploaded_file = st.file_uploader("Upload Ring Image", type=["jpg", "jpeg", "png"], key="ring_image_upload")
 
