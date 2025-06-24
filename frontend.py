@@ -102,7 +102,7 @@ class Config:
         logger.info(f"✅ Connecting to Azure Storage Account: {account_name}")
 
         # API Configuration
-        CHAT_API_URL = st.secrets["CHAT_API_URL"]
+        
         IMAGE_API_URL = st.secrets["IMAGE_API_URL"]
         BOT_AVATAR_URL = st.secrets.get("BOT_AVATAR_URL", "https://i.imgur.com/JQ6W0nD.png")
         LOGO_URL = st.secrets.get("LOGO_URL", "https://ringsandi.com/wp-content/uploads/2023/11/ringsandi-logo.png")
