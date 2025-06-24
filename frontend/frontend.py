@@ -79,12 +79,14 @@ if "logged_in" not in st.session_state:
 
 # --- CONFIGURATION ---
 class Config:
-    # Azure Storage Configuration
+    # Azure Configuration
     try:
-        AZURE_CONNECTION_STRING = st.secrets["AZURE_CONNECTION_STRING"]
-    except KeyError as e:
-        st.error(f"Missing Azure secret: {e}")
+        AZURE_CONNECTION_STRING = st.secrets["azure"]["connection_string"]
+        st.success("✅ Azure secrets loaded successfully")
+    except Exception as e:
+        st.error(f"❌ Azure secret error: {str(e)}")
         AZURE_CONNECTION_STRING = None
+    
     CONTAINER_NAME = "bot-data"
     # OAuth Configuration
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "654156...apps.googleusercontent.com")  # Changed (with fallback)
