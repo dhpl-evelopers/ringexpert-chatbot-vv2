@@ -80,33 +80,46 @@ if "logged_in" not in st.session_state:
 
 # --- CONFIGURATION ---
 # In your Config class, add this validation:
+import streamlit as st
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 class Config:
     try:
+        # Azure Storage Configuration
         AZURE_CONNECTION_STRING = st.secrets["azure"]["connection_string"]
         if not AZURE_CONNECTION_STRING.startswith("DefaultEndpointsProtocol="):
             st.error("❌ Invalid Azure connection string format")
             st.stop()
         
-        # Test connection string format
+        CONTAINER_NAME = st.secrets["azure"].get("container_name", "bot-data")
+
+        # Log Azure account name
         account_name = AZURE_CONNECTION_STRING.split("AccountName=")[1].split(";")[0]
-        logger.info(f"Connecting to Azure Storage Account: {account_name}")
+        logger.info(f"✅ Connecting to Azure Storage Account: {account_name}")
+
+        # API Configuration
+        CHAT_API_URL = st.secrets["CHAT_API_URL"]
+        IMAGE_API_URL = st.secrets["IMAGE_API_URL"]
+        BOT_AVATAR_URL = st.secrets.get("BOT_AVATAR_URL", "https://i.imgur.com/JQ6W0nD.png")
+        LOGO_URL = st.secrets.get("LOGO_URL", "https://ringsandi.com/wp-content/uploads/2023/11/ringsandi-logo.png")
+
+        # OAuth Configuration
+        GOOGLE_CLIENT_ID = st.secrets["GOOGLE_CLIENT_ID"]
+        GOOGLE_CLIENT_SECRET = st.secrets["GOOGLE_CLIENT_SECRET"]
+        REDIRECT_URI = st.secrets["REDIRECT_URI"]
+
+        # Constants
+        GOOGLE_LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg"
+        QUICK_PROMPTS = st.secrets.get("QUICK_PROMPTS", "").split(",")
+
     except Exception as e:
-        st.error(f"❌ Azure configuration error: {str(e)}")
+        st.error(f"❌ Configuration loading failed: {str(e)}")
         st.stop()
 
-    CONTAINER_NAME = "bot-data"  # Replace with your Azure container name
-    GOOGLE_LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg"
-    IMAGE_API_URL = os.getenv("IMAGE_API_URL", "https://your-image-api-endpoint.com/generate")  # Add your image API URL
-    # Rest of your config...
-    # OAuth Configuration
-    GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "654156...apps.googleusercontent.com")  # Changed (with fallback)
-    GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")  # Changed
-    REDIRECT_URI = os.getenv("REDIRECT_URI", "http://localhost:8501")  # Optional: Add to .env
-
-    # API Configuration (Optional - move to .env if sensitive)
-    CHAT_API_URL = os.getenv("CHAT_API_URL", "https://ringexpert-backend.azurewebsites.net/ask")
-    BOT_AVATAR_URL = "https://i.imgur.com/JQ6W0nD.png"
-    LOGO_URL = "https://ringsandi.com/wp-content/uploads/2023/11/ringsandi-logo.png"
     
     QUICK_PROMPTS = [
         "What is Ringsandi?",
