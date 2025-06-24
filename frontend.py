@@ -79,14 +79,24 @@ if "logged_in" not in st.session_state:
 
 
 # --- CONFIGURATION ---
+# In your Config class, add this validation:
 class Config:
-    # Azure Configuration
-    AZURE_CONNECTION_STRING = st.secrets.get("azure", {}).get("connection_string")
-    if not AZURE_CONNECTION_STRING:
-        st.error("❌ Azure Storage connection not configured in secrets")
+    try:
+        AZURE_CONNECTION_STRING = st.secrets["azure"]["connection_string"]
+        if not AZURE_CONNECTION_STRING.startswith("DefaultEndpointsProtocol="):
+            st.error("❌ Invalid Azure connection string format")
+            st.stop()
+        
+        # Test connection string format
+        account_name = AZURE_CONNECTION_STRING.split("AccountName=")[1].split(";")[0]
+        logger.info(f"Connecting to Azure Storage Account: {account_name}")
+    except Exception as e:
+        st.error(f"❌ Azure configuration error: {str(e)}")
         st.stop()
-    
-    CONTAINER_NAME = "bot-data"
+
+    CONTAINER_NAME = "bot-data"  # Replace with your Azure container name
+    GOOGLE_LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg"
+    IMAGE_API_URL = os.getenv("IMAGE_API_URL", "https://your-image-api-endpoint.com/generate")  # Add your image API URL
     # Rest of your config...
     # OAuth Configuration
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "654156...apps.googleusercontent.com")  # Changed (with fallback)
@@ -107,77 +117,141 @@ class Config:
     ]
 
 # --- AZURE STORAGE SERVICE ---
+# --- AZURE STORAGE SERVICE ---
 class AzureStorage:
-    def __init__(self):
-        self._initialize_storage()
+    def __init__(self, use_local_fallback=False):
+        self.use_local_fallback = use_local_fallback
+        self.local_storage_path = "/tmp/bot-data"
         
-    def _initialize_storage(self):
+        if not use_local_fallback:
+            try:
+                # Parse account name for logging
+                account_name = Config.AZURE_CONNECTION_STRING.split("AccountName=")[1].split(";")[0]
+                logger.info(f"🔄 Connecting to Azure Storage: {account_name}")
+                
+                self.blob_service = BlobServiceClient.from_connection_string(
+                    Config.AZURE_CONNECTION_STRING,
+                    retry_total=3,  # Add retries
+                    retry_to_secondary=True  # For RA-GRS accounts
+                )
+                
+                self.container = self.blob_service.get_container_client(Config.CONTAINER_NAME)
+                
+                # Test connection immediately
+                if not self.container.exists():
+                    logger.info(f"Creating container: {Config.CONTAINER_NAME}")
+                    self.container.create_container()
+                
+                # Verify write permissions
+                test_blob = self.container.get_blob_client("connection_test.txt")
+                test_blob.upload_blob("test", overwrite=True)
+                test_blob.delete_blob()
+                
+                logger.info("✅ Azure Storage connection verified")
+                
+            except Exception as e:
+                logger.error(f"❌ Azure Storage failed: {str(e)}")
+                st.warning("Falling back to local storage")
+                self.use_local_fallback = True
+                os.makedirs(self.local_storage_path, exist_ok=True)
+        
+    def _initialize_azure_storage(self):
         """Initialize and validate Azure Storage connection"""
         try:
-            logger.info("Initializing Azure Storage connection")
+            logger.info("🔌 Initializing Azure Storage connection")
             self.blob_service = BlobServiceClient.from_connection_string(Config.AZURE_CONNECTION_STRING)
             self.container = self.blob_service.get_container_client(Config.CONTAINER_NAME)
             
             if not self.container.exists():
-                logger.info(f"Creating container: {Config.CONTAINER_NAME}")
+                logger.info(f"📦 Creating container: {Config.CONTAINER_NAME}")
                 self.container.create_container()
                 self._initialize_folder_structure()
                 
-            logger.info("Azure Storage initialized successfully")
+            logger.info("✅ Azure Storage initialized successfully")
             
         except Exception as e:
-            logger.error(f"Storage initialization failed: {str(e)}")
-            st.error("Failed to initialize storage system. Please contact support.")
-            st.stop()
+            logger.error(f"❌ Azure Storage initialization failed: {str(e)}")
+            st.error("Failed to connect to Azure Storage. Using local fallback.")
+            self.use_local_fallback = True
+            os.makedirs(self.local_storage_path, exist_ok=True)
     
     def _initialize_folder_structure(self):
         """Create required directory structure"""
         try:
             self.upload_blob("users/.placeholder", "")
             self.upload_blob("chats/.placeholder", "")
-            logger.info("Created storage folder structure")
+            logger.info("📂 Created storage folder structure")
         except Exception as e:
-            logger.warning(f"Couldn't create folders: {str(e)}")
+            logger.warning(f"⚠️ Couldn't create folders: {str(e)}")
     
     def upload_blob(self, blob_name, data):
-        """Secure blob upload with validation"""
+     if self.use_local_fallback:
+        # Local filesystem fallback
+        file_path = os.path.join(self.local_storage_path, blob_name)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, "w") as f:
+            json.dump(data, f)
+        return True
+     else:
+        # Azure Blob Storage
         try:
             blob = self.container.get_blob_client(blob_name)
-            if isinstance(data, (dict, list)):
-                data = json.dumps(data, indent=2)
-            blob.upload_blob(data, overwrite=True)
+            blob.upload_blob(json.dumps(data), overwrite=True)
             return True
         except Exception as e:
-            logger.error(f"Upload failed for {blob_name}: {str(e)}")
+            logger.error(f"Upload failed: {str(e)}")
             return False
     
     def upload_file(self, blob_name, file_data, content_type=None):
-        """Upload file data to blob storage"""
-        try:
-            blob = self.container.get_blob_client(blob_name)
-            blob.upload_blob(file_data, overwrite=True, content_type=content_type)
-            return True
-        except Exception as e:
-            logger.error(f"File upload failed for {blob_name}: {str(e)}")
-            return False
+        """Upload file data to storage"""
+        if self.use_local_fallback:
+            try:
+                file_path = os.path.join(self.local_storage_path, blob_name)
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                with open(file_path, 'wb') as f:
+                    f.write(file_data)
+                return True
+            except Exception as e:
+                logger.error(f"❌ Local file upload failed: {str(e)}")
+                return False
+        else:
+            try:
+                blob = self.container.get_blob_client(blob_name)
+                blob.upload_blob(file_data, overwrite=True, content_type=content_type)
+                return True
+            except Exception as e:
+                logger.error(f"❌ Azure file upload failed: {str(e)}")
+                return False
     
     def download_blob(self, blob_name):
-        """Secure blob download with validation"""
+     if self.use_local_fallback:
+        file_path = os.path.join(self.local_storage_path, blob_name)
+        if os.path.exists(file_path):
+            with open(file_path, "r") as f:
+                return f.read()
+        return None
+     else:
         try:
             blob = self.container.get_blob_client(blob_name)
-            if blob.exists():
-                return blob.download_blob().readall()
-            return None
+            return blob.download_blob().readall()
         except Exception as e:
-            logger.error(f"Download failed for {blob_name}: {str(e)}")
+            logger.error(f"Download failed: {str(e)}")
             return None
     
     def blob_exists(self, blob_name):
-        try:
-            return self.container.get_blob_client(blob_name).exists()
-        except Exception as e:
-            logger.error(f"Existence check failed for {blob_name}: {str(e)}")
-            return False
+        if self.use_local_fallback:
+            return os.path.exists(os.path.join(self.local_storage_path, blob_name))
+        else:
+            try:
+                return self.container.get_blob_client(blob_name).exists()
+            except Exception as e:
+                logger.error(f"❌ Existence check failed: {str(e)}")
+                return False
+
+    # ... (keep all other methods exactly as they were: user_exists, create_user, etc.)
+
+# Initialize storage with fallback option
+
     
     def user_exists(self, email):
         return self.blob_exists(f"users/{email}.json")
@@ -226,8 +300,7 @@ class AzureStorage:
         except:
             return False
 
-# Initialize storage
-storage = AzureStorage()
+storage = AzureStorage(use_local_fallback=os.getenv("USE_LOCAL_FALLBACK", "false").lower() == "true")
 
 # --- OAUTH SERVICE ---
 class OAuthService:
@@ -1106,6 +1179,7 @@ def handle_oauth_callback():
 
 # --- MAIN APP FLOW ---
 def main():
+    
     load_css()
     handle_oauth_callback()
     show_chat_ui()
